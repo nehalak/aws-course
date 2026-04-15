@@ -73,6 +73,8 @@ global-app/
 
 ```typescript
 // bin/app.ts
+const app = new cdk.App();
+const account = process.env.CDK_DEFAULT_ACCOUNT!;   // must be set in the shell
 const REGIONS = ['us-east-1', 'eu-west-1', 'ap-southeast-1'] as const;
 const primary = 'us-east-1';
 

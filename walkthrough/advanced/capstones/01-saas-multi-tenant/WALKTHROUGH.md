@@ -343,7 +343,35 @@ curl -H "Authorization: Bearer $TOKEN_B" $API/projects/<A-project-id>
 ## Step 11: Load test and cost attribution
 > **Why:** A multi-tenant bill that says "DynamoDB = $412" is useless; finance needs to know that tenant A owes $180 and tenant B owes $232. CloudWatch + Cost Explorer tags answer this.
 
+Create `load.yml` alongside your project (set `TOKEN_A/B/C` in your shell to valid tenant JWTs first):
+
+```yaml
+# load.yml
+config:
+  target: "{{ $processEnvironment.API }}"   # export API=https://...execute-api...
+  phases:
+    - duration: 600   # 10 minutes
+      arrivalRate: 100
+  variables:
+    token:
+      - "{{ $processEnvironment.TOKEN_A }}"
+      - "{{ $processEnvironment.TOKEN_B }}"
+      - "{{ $processEnvironment.TOKEN_C }}"
+  defaults:
+    headers:
+      authorization: "Bearer {{ token }}"
+scenarios:
+  - name: create-and-read
+    flow:
+      - post:
+          url: "/projects"
+          json: { name: "load-{{ $randomString() }}" }
+      - get:
+          url: "/projects"
+```
+
 ```bash
+npm i -g artillery  # load-test CLI used below
 # artillery with 3 tenants sending mixed traffic
 artillery run load.yml  # 100 rps for 10 min, 3 tenant tokens
 

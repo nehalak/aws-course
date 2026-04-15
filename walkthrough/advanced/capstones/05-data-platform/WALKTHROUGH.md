@@ -82,6 +82,16 @@ data-platform/
 └── cdk.json
 ```
 
+```bash
+# CDK side (from cdk/)
+npm init -y
+npm i -D aws-cdk-lib constructs typescript esbuild
+npx cdk init app --language typescript
+
+# dbt side (from dbt/)
+pip install dbt-redshift
+```
+
 ## Step 2: The lake bucket + Lake Formation admin
 > **Why:** All data lives in S3 with zone-based prefixes — `raw/`, `curated/`, `marts/`. Lake Formation needs a data-lake admin role to register locations; without LF your IAM policies have to enumerate every table — impossible at scale.
 
@@ -202,6 +212,7 @@ import sys
 from awsglue.context import GlueContext
 from pyspark.context import SparkContext
 from awsglue.utils import getResolvedOptions
+from pyspark.sql.functions import current_timestamp
 
 spark = SparkContext().getOrCreate()
 gc = GlueContext(spark)

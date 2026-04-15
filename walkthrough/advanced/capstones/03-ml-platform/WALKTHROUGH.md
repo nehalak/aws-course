@@ -73,6 +73,17 @@ ml-platform/
 └── dbt/                         # optional SQL features
 ```
 
+```bash
+# CDK side (from cdk/)
+npm init -y
+npm i -D aws-cdk-lib constructs typescript esbuild @types/aws-lambda
+npm i @cdklabs/generative-ai-cdk-constructs   # Step 8 (Bedrock KB/Agent L2s)
+npx cdk init app --language typescript
+
+# Pipeline side (from pipelines/)
+pip install sagemaker boto3
+```
+
 ## Step 2: Data lake + Feature Store
 > **Why:** Feature Store solves the training/serving skew problem: the same feature definition is used to materialize offline (for training) and online (low-latency inference). If training uses `7d_avg_clicks` computed in pandas and serving recomputes it in a different Lambda, your metrics are lies.
 
@@ -81,6 +92,12 @@ ml-platform/
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as sm from 'aws-cdk-lib/aws-sagemaker';
+import * as iam from 'aws-cdk-lib/aws-iam';
+
+const fsRole = new iam.Role(this, 'FsRole', {
+  assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
+  managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSageMakerFeatureStoreAccess')],
+});
 
 const raw     = new s3.Bucket(this, 'Raw',     { versioned: true });
 const curated = new s3.Bucket(this, 'Curated', { versioned: true });
@@ -172,6 +189,8 @@ listener.addTargetGroups('Split', {
 
 ```python
 from sagemaker.model_monitor import DefaultModelMonitor, DataCaptureConfig
+from sagemaker.model_monitor.dataset_format import DatasetFormat
+from sagemaker.model_monitor import CronExpressionGenerator
 capture = DataCaptureConfig(enable_capture=True, sampling_percentage=100, destination_s3_uri=f's3://{capture_bucket}/')
 
 # baseline

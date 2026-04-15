@@ -72,7 +72,8 @@ orders-platform/
 ```bash
 npx cdk init app --language typescript
 npm i aws-cdk-lib constructs
-npm i @aws-sdk/client-eventbridge @aws-sdk/client-dynamodb
+npm i @aws-sdk/client-eventbridge @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+npm i -g artillery  # used for the Step 10 load test
 ```
 
 ## Step 2: Bus + archive + schema registry
@@ -238,13 +239,18 @@ const notifyFifo = new sqs.Queue(this, 'NotifyFifo', {
 > **Why:** EventBridge is **at-least-once**. If your inventory service decrements stock every time it receives an event you will oversell. Every consumer MUST dedupe on `detail.idempotencyKey` (or event ID) via a conditional `PutItem`.
 
 ```typescript
-// inside inventory service handler
-await ddb.put({
+// inside inventory service handler (AWS SDK v3)
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const now = Math.floor(Date.now() / 1000);
+
+await ddb.send(new PutCommand({
   TableName: 'inv-idem',
   Item: { key: event.id, ttl: now + 86400 },
   ConditionExpression: 'attribute_not_exists(#k)',
   ExpressionAttributeNames: { '#k': 'key' },
-}).promise().catch(e => { if (e.name === 'ConditionalCheckFailedException') return; throw e; });
+})).catch(e => { if (e.name === 'ConditionalCheckFailedException') return; throw e; });
 ```
 
 Also: propagate `correlationId` through every event so X-Ray traces one order end-to-end.
